@@ -1,0 +1,193 @@
+/* 自定义样式 - 修复首页蓝色背景问题 */
+
+/* 完全禁用首页全屏背景，直接显示文章列表 */
+#page-header.full_page,
+header.full_page,
+#page-header,
+header,
+.full_page {
+    display: none !important;
+}
+
+/* 确保首页直接显示文章列表 */
+#recent-posts {
+    margin-top: 0 !important;
+    padding-top: 20px !important;
+}
+
+/* 调整页面布局，移除全屏背景 */
+#page-header {
+    display: none !important;
+}
+
+/* 确保内容区域正常显示 */
+#content-inner {
+    margin-top: 0 !important;
+    padding-top: 20px !important;
+}
+
+/* 调整页面整体布局 */
+.page {
+    background-color: #ffffff !important;
+}
+
+/* 确保文章列表可见 */
+.recent-posts {
+    margin-top: 0 !important;
+    padding-top: 20px !important;
+}
+
+/* 确保文章列表可见 */
+#content-inner {
+    margin-top: 0 !important;
+}
+
+/* 调整页面布局 */
+.page {
+    background-color: #ffffff;
+}
+
+/* 确保文章列表正常显示 */
+.recent-posts {
+    margin-top: 0 !important;
+}
+
+/* 调整导航栏样式 - 蓝色导航栏 - 更强制地覆盖 */
+#nav,
+.nav,
+#nav.nav,
+nav#nav,
+.navbar,
+#navbar,
+header nav,
+nav header,
+#page-header nav,
+nav#page-header {
+    background-color: #2196F3 !important;
+    background: #2196F3 !important;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3);
+}
+
+/* 导航栏链接样式 - 更强制地覆盖 */
+#nav .nav-item a,
+.nav .nav-item a,
+#nav a,
+.nav a,
+#nav .menu-item a,
+.nav .menu-item a,
+#nav .menu a,
+.nav .menu a,
+#nav .menu a[href="/search/"],
+.nav .menu a[href="/search/"] {
+    color: #ffffff !important;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+#nav .nav-item a:hover,
+.nav .nav-item a:hover,
+#nav a:hover,
+.nav a:hover,
+#nav .menu a[href="/search/"]:hover,
+.nav .menu a[href="/search/"]:hover {
+    color: #E3F2FD !important;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+
+/* 导航栏标题样式 - 更强制地覆盖 */
+#nav .site-title,
+.nav .site-title,
+#nav .navbar-brand,
+.nav .navbar-brand,
+#nav h1,
+.nav h1 {
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+/* 导航栏移动端菜单按钮 */
+#nav .nav-toggle,
+.nav .nav-toggle,
+#nav .menu-toggle,
+.nav .menu-toggle {
+    color: #ffffff !important;
+}
+
+/* 调整站点标题样式 */
+#site-title {
+    color: #333 !important;
+    text-shadow: none !important;
+}
+
+/* 调整副标题样式 */
+#site-subtitle {
+    color: #666 !important;
+}
+
+/* 突出显示研究生身份 */
+.author-info-description {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* GitHub按钮样式优化 */
+#card-info-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 10px 20px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+#card-info-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    color: white;
+    text-decoration: none;
+}
+
+/* 搜索功能样式 */
+#search-box {
+    background-color: #ffffff;
+    border: 2px solid #2196F3;
+    border-radius: 25px;
+    padding: 10px 20px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.2);
+}
+
+#search-box:focus {
+    outline: none;
+    border-color: #1976D2;
+    box-shadow: 0 4px 20px rgba(33, 150, 243, 0.4);
+}
+
+/* 搜索结果样式 */
+.search-result {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.search-result:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* 搜索页面标题样式 */
+.search-title {
+    color: #2196F3;
+    font-weight: 600;
+    margin-bottom: 20px;
+}

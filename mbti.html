@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBTI性格测试</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    min-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+}
+
+.screen {
+    display: none;
+    padding: 40px 30px;
+    flex: 1;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 欢迎页面 */
+.welcome-content {
+    text-align: center;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.welcome-content h1 {
+    font-size: 2.5rem;
+    color: #667eea;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #666;
+    margin-bottom: 40px;
+}
+
+.intro-text {
+    max-width: 500px;
+    margin: 0 auto 40px;
+    line-height: 1.8;
+    color: #555;
+}
+
+.intro-text p {
+    margin-bottom: 15px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 15px 40px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+    margin-left: 15px;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}
+
+/* 进度条 */
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+/* 问题容器 */
+.question-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.question-number {
+    font-size: 0.9rem;
+    color: #999;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.question-text {
+    font-size: 1.5rem;
+    color: #333;
+    margin-bottom: 30px;
+    line-height: 1.6;
+    text-align: center;
+    font-weight: 600;
+}
+
+.options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex: 1;
+}
+
+.option {
+    padding: 20px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    line-height: 1.6;
+    text-align: left;
+}
+
+.option:hover {
+    background: #f0f0f0;
+    border-color: #667eea;
+    transform: translateX(5px);
+}
+
+.option.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* 结果页面 */
+.result-content {
+    text-align: center;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.result-header h1 {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 30px;
+}
+
+.mbti-badge {
+    font-size: 4rem;
+    font-weight: 700;
+    color: #667eea;
+    margin: 20px 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    letter-spacing: 8px;
+}
+
+.result-description {
+    max-width: 600px;
+    margin: 30px auto;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    line-height: 1.8;
+    color: #555;
+    font-size: 1rem;
+    text-align: left;
+}
+
+.result-details {
+    margin: 30px 0;
+}
+
+.dimension h3 {
+    font-size: 1.3rem;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.dimensions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.dimension-item {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.dimension-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.dimension-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.result-actions {
+    margin-top: 40px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        min-height: calc(100vh - 20px);
+        border-radius: 15px;
+    }
+
+    .screen {
+        padding: 25px 20px;
+    }
+
+    .welcome-content h1 {
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .question-text {
+        font-size: 1.2rem;
+    }
+
+    .option {
+        padding: 15px;
+        font-size: 0.95rem;
+    }
+
+    .mbti-badge {
+        font-size: 3rem;
+        letter-spacing: 4px;
+    }
+
+    .result-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .result-description {
+        padding: 20px;
+        font-size: 0.95rem;
+    }
+
+    .dimensions-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .btn {
+        padding: 12px 30px;
+        font-size: 1rem;
+    }
+
+    .result-actions {
+        flex-direction: column;
+    }
+
+    .btn-secondary {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-content h1 {
+        font-size: 1.8rem;
+    }
+
+    .question-text {
+        font-size: 1.1rem;
+    }
+
+    .mbti-badge {
+        font-size: 2.5rem;
+        letter-spacing: 2px;
+    }
+
+    .dimensions-grid {
+        gap: 8px;
+    }
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 欢迎页面 -->
+        <div id="welcome-screen" class="screen active">
+            <div class="welcome-content">
+                <h1>MBTI性格测试</h1>
+                <p class="subtitle">发现真实的自己</p>
+                <div class="intro-text">
+                    <p>本测试包含28道题目，大约需要10-15分钟完成。</p>
+                    <p>请根据你的第一反应选择最符合你的选项，没有对错之分。</p>
+                </div>
+                <button id="start-btn" class="btn btn-primary">开始测试</button>
+            </div>
+        </div>
+
+        <!-- 测试页面 -->
+        <div id="test-screen" class="screen">
+            <div class="progress-bar">
+                <div id="progress" class="progress-fill"></div>
+            </div>
+            <div class="question-container">
+                <div class="question-number">
+                    <span id="current-question">1</span> / <span id="total-questions">28</span>
+                </div>
+                <h2 id="question-text" class="question-text"></h2>
+                <div id="options-container" class="options-container"></div>
+            </div>
+        </div>
+
+        <!-- 结果页面 -->
+        <div id="result-screen" class="screen">
+            <div class="result-content">
+                <div class="result-header">
+                    <h1>你的MBTI类型是</h1>
+                    <div id="mbti-type" class="mbti-badge"></div>
+                </div>
+                <div id="result-description" class="result-description"></div>
+                <div class="result-details">
+                    <div class="dimension">
+                        <h3>性格维度分析</h3>
+                        <div id="dimensions" class="dimensions-grid"></div>
+                    </div>
+                </div>
+                <div class="result-actions">
+                    <button id="restart-btn" class="btn btn-primary">重新测试</button>
+                    <button id="share-btn" class="btn btn-secondary">分享结果</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// MBTI测试题目
+const questions = [
+    { id: 1, text: "在聚会中，你更倾向于：", options: [
+        { text: "与很多人交流，认识新朋友", value: "E" },
+        { text: "与几个熟悉的朋友深入交谈", value: "I" }
+    ]},
+    { id: 2, text: "你更倾向于：", options: [
+        { text: "关注事实和细节", value: "S" },
+        { text: "关注可能性和概念", value: "N" }
+    ]},
+    { id: 3, text: "做决定时，你更依赖：", options: [
+        { text: "逻辑和分析", value: "T" },
+        { text: "价值观和感受", value: "F" }
+    ]},
+    { id: 4, text: "你更喜欢：", options: [
+        { text: "提前计划和安排", value: "J" },
+        { text: "保持灵活和开放", value: "P" }
+    ]},
+    { id: 5, text: "当你感到疲惫时，你更愿意：", options: [
+        { text: "与朋友一起出去放松", value: "E" },
+        { text: "独自在家休息", value: "I" }
+    ]},
+    { id: 6, text: "学习新东西时，你更关注：", options: [
+        { text: "实际应用和具体例子", value: "S" },
+        { text: "理论框架和整体概念", value: "N" }
+    ]},
+    { id: 7, text: "面对冲突时，你更可能：", options: [
+        { text: "直接面对，寻求解决方案", value: "T" },
+        { text: "考虑他人感受，寻求和谐", value: "F" }
+    ]},
+    { id: 8, text: "你更倾向于：", options: [
+        { text: "按计划执行任务", value: "J" },
+        { text: "根据情况灵活调整", value: "P" }
+    ]},
+    { id: 9, text: "在团队中，你更愿意：", options: [
+        { text: "积极参与讨论和互动", value: "E" },
+        { text: "先思考再表达观点", value: "I" }
+    ]},
+    { id: 10, text: "描述事物时，你更倾向于：", options: [
+        { text: "使用具体、准确的描述", value: "S" },
+        { text: "使用比喻和象征性语言", value: "N" }
+    ]},
+    { id: 11, text: "评价他人时，你更看重：", options: [
+        { text: "能力和成就", value: "T" },
+        { text: "品格和动机", value: "F" }
+    ]},
+    { id: 12, text: "你更喜欢：", options: [
+        { text: "有明确截止日期的任务", value: "J" },
+        { text: "可以自由安排时间的任务", value: "P" }
+    ]},
+    { id: 13, text: "社交活动后，你通常：", options: [
+        { text: "感到精力充沛", value: "E" },
+        { text: "需要时间独处恢复", value: "I" }
+    ]},
+    { id: 14, text: "解决问题时，你更倾向于：", options: [
+        { text: "使用已知有效的方法", value: "S" },
+        { text: "尝试新的创新方法", value: "N" }
+    ]},
+    { id: 15, text: "批评他人时，你更可能：", options: [
+        { text: "直接指出问题", value: "T" },
+        { text: "温和地提出建议", value: "F" }
+    ]},
+    { id: 16, text: "你更倾向于：", options: [
+        { text: "提前完成工作", value: "J" },
+        { text: "在压力下工作更高效", value: "P" }
+    ]},
+    { id: 17, text: "在会议中，你更可能：", options: [
+        { text: "主动发言和分享想法", value: "E" },
+        { text: "仔细倾听，然后回应", value: "I" }
+    ]},
+    { id: 18, text: "你更相信：", options: [
+        { text: "经验证明的事实", value: "S" },
+        { text: "直觉和灵感", value: "N" }
+    ]},
+    { id: 19, text: "做决定时，你更关注：", options: [
+        { text: "客观标准和公平性", value: "T" },
+        { text: "个人价值观和影响", value: "F" }
+    ]},
+    { id: 20, text: "你更喜欢：", options: [
+        { text: "有组织、有序的环境", value: "J" },
+        { text: "灵活、自发的环境", value: "P" }
+    ]},
+    { id: 21, text: "认识新朋友时，你更可能：", options: [
+        { text: "主动介绍自己", value: "E" },
+        { text: "等待别人先开口", value: "I" }
+    ]},
+    { id: 22, text: "你更倾向于：", options: [
+        { text: "关注当下和现实", value: "S" },
+        { text: "关注未来和可能性", value: "N" }
+    ]},
+    { id: 23, text: "面对困难时，你更可能：", options: [
+        { text: "分析问题，找出原因", value: "T" },
+        { text: "关注情感和人际关系", value: "F" }
+    ]},
+    { id: 24, text: "你更倾向于：", options: [
+        { text: "做出决定并坚持", value: "J" },
+        { text: "保持选择开放", value: "P" }
+    ]},
+    { id: 25, text: "在社交场合，你更可能：", options: [
+        { text: "成为关注的焦点", value: "E" },
+        { text: "在背景中观察", value: "I" }
+    ]},
+    { id: 26, text: "你更倾向于：", options: [
+        { text: "相信眼见为实", value: "S" },
+        { text: "相信直觉和预感", value: "N" }
+    ]},
+    { id: 27, text: "评价情况时，你更关注：", options: [
+        { text: "逻辑一致性", value: "T" },
+        { text: "情感和谐", value: "F" }
+    ]},
+    { id: 28, text: "你更喜欢：", options: [
+        { text: "有结构、可预测的生活", value: "J" },
+        { text: "充满变化和惊喜的生活", value: "P" }
+    ]}
+];
+
+// MBTI类型描述
+const mbtiDescriptions = {
+    "INTJ": {
+        name: "建筑师",
+        description: "你是一个战略思考者，具有强大的逻辑分析能力和创新思维。你独立、自信，喜欢通过系统化的方式解决问题。你追求知识和效率，对复杂问题有独特的见解。"
+    },
+    "INTP": {
+        name: "逻辑学家",
+        description: "你是一个理论家，对知识充满好奇，喜欢探索抽象概念。你独立思考，善于分析，追求逻辑的完美。你享受智力挑战，对复杂系统有深刻理解。"
+    },
+    "ENTJ": {
+        name: "指挥官",
+        description: "你是一个天生的领导者，具有强大的组织能力和决策力。你自信、果断，善于制定长期计划并执行。你追求效率和成功，能够激励他人实现共同目标。"
+    },
+    "ENTP": {
+        name: "辩论家",
+        description: "你是一个创新者，思维敏捷，喜欢挑战传统观念。你充满好奇心，善于发现新的可能性。你享受智力辩论，能够从多个角度分析问题。"
+    },
+    "INFJ": {
+        name: "提倡者",
+        description: "你是一个理想主义者，具有深刻的洞察力和同理心。你关心他人，追求意义和价值。你富有创造力，能够看到事物的深层含义，致力于帮助他人成长。"
+    },
+    "INFP": {
+        name: "调停者",
+        description: "你是一个充满想象力的理想主义者，重视个人价值观和真实性。你富有同理心，关心他人感受。你追求和谐，喜欢通过创造性的方式表达自己。"
+    },
+    "ENFJ": {
+        name: "主人公",
+        description: "你是一个天生的领导者，具有强大的同理心和沟通能力。你关心他人成长，善于激励和指导。你追求和谐，能够理解他人需求并帮助实现目标。"
+    },
+    "ENFP": {
+        name: "竞选者",
+        description: "你是一个充满热情和创造力的人，喜欢探索新的可能性。你乐观、友好，善于与他人建立联系。你追求自由和多样性，享受生活的每一刻。"
+    },
+    "ISTJ": {
+        name: "物流师",
+        description: "你是一个务实可靠的人，注重事实和细节。你负责任、有条理，善于制定和执行计划。你重视传统和稳定，能够可靠地完成任务。"
+    },
+    "ISFJ": {
+        name: "守护者",
+        description: "你是一个温暖、关心他人的人，具有强烈的责任感和同理心。你细心、可靠，善于照顾他人需求。你重视传统和稳定，致力于保护所爱的人。"
+    },
+    "ESTJ": {
+        name: "总经理",
+        description: "你是一个高效的组织者，具有强大的管理能力和执行力。你务实、果断，善于制定规则和流程。你追求效率和秩序，能够带领团队实现目标。"
+    },
+    "ESFJ": {
+        name: "执政官",
+        description: "你是一个热情、关心他人的人，具有强大的社交能力和组织能力。你负责任、可靠，善于照顾他人。你重视和谐和传统，喜欢与他人合作。"
+    },
+    "ISTP": {
+        name: "鉴赏家",
+        description: "你是一个实用主义者，具有强大的动手能力和问题解决能力。你独立、灵活，喜欢通过实践学习。你冷静、理性，善于在压力下保持冷静。"
+    },
+    "ISFP": {
+        name: "探险家",
+        description: "你是一个艺术型的人，具有强烈的审美感和创造力。你灵活、随和，享受当下的生活。你关心他人，但更倾向于通过行动而非言语表达。"
+    },
+    "ESTP": {
+        name: "企业家",
+        description: "你是一个行动派，具有强大的适应能力和实践能力。你自信、勇敢，喜欢冒险和挑战。你活在当下，善于快速做出决定并采取行动。"
+    },
+    "ESFP": {
+        name: "表演者",
+        description: "你是一个充满活力的人，喜欢成为关注的焦点。你乐观、友好，善于与他人建立联系。你享受生活，喜欢通过行动和体验来表达自己。"
+    }
+};
+
+// 应用状态
+let currentQuestionIndex = 0;
+let answers = {
+    E: 0, I: 0,
+    S: 0, N: 0,
+    T: 0, F: 0,
+    J: 0, P: 0
+};
+
+// DOM元素
+const welcomeScreen = document.getElementById('welcome-screen');
+const testScreen = document.getElementById('test-screen');
+const resultScreen = document.getElementById('result-screen');
+const startBtn = document.getElementById('start-btn');
+const restartBtn = document.getElementById('restart-btn');
+const shareBtn = document.getElementById('share-btn');
+const questionText = document.getElementById('question-text');
+const optionsContainer = document.getElementById('options-container');
+const progressFill = document.getElementById('progress');
+const currentQuestionSpan = document.getElementById('current-question');
+const totalQuestionsSpan = document.getElementById('total-questions');
+const mbtiTypeDiv = document.getElementById('mbti-type');
+const resultDescriptionDiv = document.getElementById('result-description');
+const dimensionsDiv = document.getElementById('dimensions');
+
+// 初始化
+totalQuestionsSpan.textContent = questions.length;
+
+// 开始测试
+startBtn.addEventListener('click', () => {
+    showScreen('test');
+    loadQuestion();
+});
+
+// 重新测试
+restartBtn.addEventListener('click', () => {
+    currentQuestionIndex = 0;
+    answers = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
+    showScreen('test');
+    loadQuestion();
+});
+
+// 分享结果
+shareBtn.addEventListener('click', () => {
+    const mbtiType = calculateMBTI();
+    const shareText = `我的MBTI性格类型是：${mbtiType}\n\n${mbtiDescriptions[mbtiType].description}\n\n快来测试你的MBTI类型吧！`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'MBTI性格测试结果',
+            text: shareText,
+            url: window.location.href
+        }).catch(err => {
+            copyToClipboard(shareText);
+        });
+    } else {
+        copyToClipboard(shareText);
+    }
+});
+
+// 复制到剪贴板
+function copyToClipboard(text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('结果已复制到剪贴板！');
+        });
+    } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('结果已复制到剪贴板！');
+    }
+}
+
+// 显示屏幕
+function showScreen(screen) {
+    welcomeScreen.classList.remove('active');
+    testScreen.classList.remove('active');
+    resultScreen.classList.remove('active');
+    
+    if (screen === 'welcome') {
+        welcomeScreen.classList.add('active');
+    } else if (screen === 'test') {
+        testScreen.classList.add('active');
+    } else if (screen === 'result') {
+        resultScreen.classList.add('active');
+    }
+}
+
+// 加载问题
+function loadQuestion() {
+    if (currentQuestionIndex >= questions.length) {
+        showResult();
+        return;
+    }
+    
+    const question = questions[currentQuestionIndex];
+    questionText.textContent = question.text;
+    currentQuestionSpan.textContent = currentQuestionIndex + 1;
+    
+    // 更新进度条
+    const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+    progressFill.style.width = progress + '%';
+    
+    // 清空选项容器
+    optionsContainer.innerHTML = '';
+    
+    // 创建选项
+    question.options.forEach((option, index) => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'option';
+        optionDiv.textContent = option.text;
+        optionDiv.dataset.value = option.value;
+        optionDiv.addEventListener('click', (e) => selectOption(option.value, e.target));
+        optionsContainer.appendChild(optionDiv);
+    });
+}
+
+// 选择选项
+function selectOption(value, targetElement) {
+    // 移除之前的选择
+    document.querySelectorAll('.option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    // 标记当前选择
+    targetElement.classList.add('selected');
+    
+    // 记录答案
+    answers[value]++;
+    
+    // 延迟后加载下一题
+    setTimeout(() => {
+        currentQuestionIndex++;
+        loadQuestion();
+    }, 500);
+}
+
+// 计算MBTI类型
+function calculateMBTI() {
+    let mbti = '';
+    
+    // E vs I
+    mbti += answers.E >= answers.I ? 'E' : 'I';
+    
+    // S vs N
+    mbti += answers.S >= answers.N ? 'S' : 'N';
+    
+    // T vs F
+    mbti += answers.T >= answers.F ? 'T' : 'F';
+    
+    // J vs P
+    mbti += answers.J >= answers.P ? 'J' : 'P';
+    
+    return mbti;
+}
+
+// 显示结果
+function showResult() {
+    const mbtiType = calculateMBTI();
+    const description = mbtiDescriptions[mbtiType];
+    
+    mbtiTypeDiv.textContent = mbtiType;
+    resultDescriptionDiv.innerHTML = `
+        <h3>${description.name}</h3>
+        <p>${description.description}</p>
+    `;
+    
+    // 显示维度分析
+    dimensionsDiv.innerHTML = `
+        <div class="dimension-item">
+            <div class="dimension-label">外向/内向</div>
+            <div class="dimension-value">${answers.E >= answers.I ? 'E' : 'I'} (${Math.round((Math.max(answers.E, answers.I) / (answers.E + answers.I)) * 100)}%)</div>
+        </div>
+        <div class="dimension-item">
+            <div class="dimension-label">感觉/直觉</div>
+            <div class="dimension-value">${answers.S >= answers.N ? 'S' : 'N'} (${Math.round((Math.max(answers.S, answers.N) / (answers.S + answers.N)) * 100)}%)</div>
+        </div>
+        <div class="dimension-item">
+            <div class="dimension-label">思考/情感</div>
+            <div class="dimension-value">${answers.T >= answers.F ? 'T' : 'F'} (${Math.round((Math.max(answers.T, answers.F) / (answers.T + answers.F)) * 100)}%)</div>
+        </div>
+        <div class="dimension-item">
+            <div class="dimension-label">判断/感知</div>
+            <div class="dimension-value">${answers.J >= answers.P ? 'J' : 'P'} (${Math.round((Math.max(answers.J, answers.P) / (answers.J + answers.P)) * 100)}%)</div>
+        </div>
+    `;
+    
+    showScreen('result');
+}
+    </script>
+</body>
+</html>

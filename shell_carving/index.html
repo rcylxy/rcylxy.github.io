@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贝雕人格测试 - 探寻你内心的海洋印记</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container-main">
+        <!-- 首页 -->
+        <div id="homePage" class="page active">
+            <div class="header">
+                <h1>🐚 贝雕人格测试</h1>
+                <p>探寻你内心的海洋印记</p>
+            </div>
+
+            <div class="card intro-section">
+                <div class="card-body">
+                    <h2><i class="fas fa-compass"></i> 欢迎来到贝雕人格的世界</h2>
+                    <p>每个人都是一枚被时光海浪冲刷的贝壳，拥有独一无二的纹理与光芒。通过这场测试，你将探寻自己的"贝雕人格"，了解你是哪种类型的"匠人"，如何将生活的砂砾，雕琢成生命的艺术品。</p>
+                    
+                    <div class="button-group" style="margin-top: 40px;">
+                        <button class="btn-custom btn-primary-custom" onclick="goToTest()">
+                            <i class="fas fa-play"></i> 开始测试
+                        </button>
+                    </div>
+              </div>
+              </div>
+            </div>
+
+        <!-- 测试页面 -->
+        <div id="testPage" class="page">
+            <div class="header">
+                <h1>🐚 贝雕人格测试</h1>
+                <p>探寻你内心的海洋印记</p>
+            </div>
+
+            <div class="card test-section">
+                <div class="card-body">
+                    <div class="progress-section">
+                        <div class="progress">
+                            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+              </div>
+                        <div class="progress-text">
+                            <span id="currentQuestion">1</span> / <span id="totalQuestions">8</span>
+              </div>
+            </div>
+
+                    <div id="questionContainer" class="question-container">
+                        <!-- 动态加载问题 -->
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-custom btn-secondary-custom" id="prevBtn" onclick="previousQuestion()" style="display: none;">
+                            <i class="fas fa-arrow-left"></i> 上一题
+                        </button>
+                        <button class="btn-custom btn-primary-custom" id="nextBtn" onclick="nextQuestion()">
+                            <i class="fas fa-arrow-right"></i> 下一题
+                        </button>
+                    </div>
+              </div>
+            </div>
+              </div>
+
+        <!-- 结果页面 -->
+        <div id="resultPage" class="page">
+            <div class="header">
+                <h1>🐚 你的贝雕人格</h1>
+                <p>探寻你内心的海洋印记</p>
+            </div>
+
+            <div class="card result-section">
+                <div class="card-body">
+                    <div class="result-header">
+                        <div class="result-title" id="resultTitle">灯塔守护者</div>
+                        <div class="result-subtitle" id="resultSubtitle">潮涌派 · 具象之锚 · 精雕流 · 秩序螺号</div>
+                    </div>
+
+                    <div class="dimension-tags" id="dimensionTags"></div>
+
+                    <div class="result-description" id="resultDescription">
+                        你理性、可靠且务实。你像海岸边的灯塔，为他人提供清晰的指引和稳定的支持。你的作品结构严谨，工艺精湛，是规则与美的完美结合。在生活中，你是那个能制定完美计划并执行到底的人。
+                    </div>
+
+                    <div class="dimensions-detail" id="dimensionsDetail"></div>
+
+                    <div class="button-group" style="margin-top: 40px;">
+                        <button class="btn-custom btn-secondary-custom" onclick="goToHome()">
+                            <i class="fas fa-redo"></i> 重新测试
+                        </button>
+                        <button class="btn-custom btn-primary-custom" onclick="shareResult()">
+                            <i class="fas fa-share-alt"></i> 分享结果
+                        </button>
+                    </div>
+              </div>
+            </div>
+          </div>
+
+        <!-- 详情页面 -->
+        <div id="detailPage" class="page">
+            <div class="header">
+                <h1>🐚 维度详情</h1>
+                <p>了解你的人格特质</p>
+            </div>
+
+            <div class="card detail-section">
+                <div class="card-body">
+                    <div id="detailContent"></div>
+
+                    <div class="button-group" style="margin-top: 40px;">
+                        <button class="btn-custom btn-secondary-custom" onclick="goToHome()">
+                            <i class="fas fa-home"></i> 返回首页
+                        </button>
+                        <button class="btn-custom btn-primary-custom" onclick="goToResult()">
+                            <i class="fas fa-arrow-left"></i> 返回结果
+                        </button>
+                </div>
+              </div>
+          </div>
+        </div>
+  </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

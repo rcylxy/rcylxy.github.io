@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贝雕人格测试</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+
+        :root {
+            --primary-color: #1a3a5a; /* 深海蓝 */
+            --secondary-color: #f0e5d8; /* 贝壳白 */
+            --accent-color: #d4af37; /* 沙金 */
+            --text-color: #333;
+            --light-text-color: #f0e5d8;
+            --background-gradient: linear-gradient(135deg, #e0eafc, #cfdef3);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Noto Serif SC', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: var(--background-gradient);
+            color: var(--text-color);
+            overflow-y: auto; /* 允许垂直滚动 */
+            padding: 20px 0; /* 为body增加上下内边距 */
+            box-sizing: border-box;
+            transition: background 0.5s ease;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            margin: auto; /* 替代之前的margin，确保在flex容器中表现一致 */
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+            padding: 40px;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        h1, h2 {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        h2.subtitle {
+            font-size: 1.2rem;
+            font-weight: 400;
+            color: var(--primary-color);
+            opacity: 0.8;
+            margin-top: 0;
+        }
+
+        .intro-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin: 20px 0 30px;
+        }
+
+        .dimensions-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* 默认单列 */
+            gap: 15px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .dimension-card {
+            background: rgba(255, 255, 255, 0.65);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .dimension-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .dimension-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+            position: relative;
+            padding-left: 15px;
+        }
+
+        .dimension-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 100%;
+            background-color: var(--accent-color);
+            border-radius: 2px;
+        }
+
+        .tendency {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+
+        .tendency:first-of-type {
+            margin-bottom: 8px;
+        }
+
+        /* 响应式布局：当屏幕宽度大于640px时，变为两列 */
+        @media (min-width: 640px) {
+            .dimensions-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+        }
+
+        .question-counter {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: var(--primary-color);
+            color: var(--light-text-color);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .question-text {
+            font-size: 1.5rem;
+            margin: 40px 0;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .navigation-buttons {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #back-btn {
+            background-color: transparent;
+            color: var(--text-color);
+            border: 1px solid #ccc;
+            opacity: 0.7;
+        }
+
+        #back-btn:hover {
+            background-color: #f0f0f0;
+            color: var(--text-color);
+            opacity: 1;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn {
+            padding: 15px 20px;
+            border: 2px solid var(--primary-color);
+            background-color: transparent;
+            color: var(--primary-color);
+            font-family: 'Noto Serif SC', serif;
+            font-size: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-color);
+            color: var(--light-text-color);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(26, 58, 90, 0.2);
+        }
+
+        #start-btn {
+            background-color: var(--primary-color);
+            color: var(--light-text-color);
+            border: none;
+            padding: 18px 40px;
+            font-size: 1.2rem;
+        }
+
+        #start-btn:hover {
+            background-color: #2c5d8e;
+        }
+
+        .result-title {
+            font-size: 2.8rem;
+            color: var(--accent-color);
+            margin: 20px 0 10px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .result-type {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .result-description {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            text-align: left;
+            margin-bottom: 30px;
+        }
+        
+        .final-words {
+            font-style: italic;
+            opacity: 0.8;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+
+        #restart-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+        }
+
+        #restart-btn:hover {
+            background-color: #b89b31;
+            color: white;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 欢迎页 -->
+        <div id="page-start" class="page active">
+            <h1>贝雕人格测试</h1>
+            <h2 class="subtitle">探寻你内心的海洋印记</h2>
+            <p class="intro-text">
+                每个人都是一枚被时光海浪冲刷的贝壳，拥有独一无二的纹理与光芒。通过这场测试，你将探寻自己的“贝雕人格”，了解你是哪种类型的“匠人”，如何将生活的砂砾，雕琢成生命的艺术品。
+            </p>
+
+            <div class="dimensions-grid">
+                <div class="dimension-card">
+                    <div class="dimension-title">1. 灵感溯源</div>
+                    <div class="tendency">· 潮涌派：你的灵感如潮水，来自外部世界的动态、人际互动和新鲜体验。</div>
+                    <div class="tendency">· 凝砂派：你的灵感如沉积的砂砾，来自内在的思考、回忆和个人深邃的世界。</div>
+                </div>
+                
+                <div class="dimension-card">
+                    <div class="dimension-title">2. 形意取向</div>
+                    <div class="tendency">· 具象之锚：你注重具体、细节和现实。你喜欢清晰的轮廓和可触摸的真实感。</div>
+                    <div class="tendency">· 抽象之浪：你偏爱整体、象征和可能性。你善于捕捉朦胧的意境和未来的潜力。</div>
+                </div>
+                
+                <div class="dimension-card">
+                    <div class="dimension-title">3. 琢磨之道</div>
+                    <div class="tendency">· 精雕流：你决策时倾向于逻辑分析、权衡利弊，追求合理与完美。</div>
+                    <div class="tendency">· 随形流：你决策时更依赖价值观、共情和人际和谐，追求自然与灵动。</div>
+                </div>
+                
+                <div class="dimension-card">
+                    <div class="dimension-title">4. 成器之韵</div>
+                    <div class="tendency">· 秩序螺号：你喜欢有计划、有结构、有条理的生活方式，追求稳定与掌控感。</div>
+                    <div class="tendency">· 灵动珍珠：你偏好灵活、开放、即兴的生活方式，乐于适应变化和拥抱未知。</div>
+                </div>
+            </div>
+
+            <button id="start-btn" class="btn">开始探索</button>
+        </div>
+
+        <!-- 问题页模板 -->
+        <div id="page-question" class="page">
+            <div id="question-counter" class="question-counter"></div>
+            <h2 id="question-text" class="question-text"></h2>
+            <div id="question-options" class="options">
+                <!-- Options will be dynamically inserted here -->
+            </div>
+            <div class="navigation-buttons">
+                 <button id="back-btn" class="btn">返回上一题</button>
+            </div>
+        </div>
+
+        <!-- 结果页 -->
+        <div id="page-result" class="page">
+            <h2 class="subtitle">你的贝雕人格是</h2>
+            <h1 id="result-title" class="result-title"></h1>
+            <p id="result-type" class="result-type"></p>
+            <p id="result-description" class="result-description"></p>
+            <p class="final-words">无论你是哪一种贝雕人格，都没有优劣之分。正如大海容纳万千贝壳，每一种人格都是独一无二的存在。了解自己的特质，不是为了给自己设限，而是为了更好地雕琢属于你的人生艺术品。</p>
+            <button id="restart-btn" class="btn">重新测试</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const questions = [
+                {
+                    text: "当你面对一块未经雕琢的贝壳时，你首先想到的是？",
+                    options: [
+                        { text: "它可能成为什么？（一个胸针、一幅画、一个摆件）", type: "具象之锚" },
+                        { text: "它带给你的感觉是什么？（海洋的呼吸、时光的痕迹）", type: "抽象之浪" }
+                    ]
+                },
+                {
+                    text: "你更享受创作过程中的哪个部分？",
+                    options: [
+                        { text: "收集各种各样的素材，与不同的人交流想法。", type: "潮涌派" },
+                        { text: "独自沉浸其中，反复推敲一个细节，与内心对话。", type: "凝砂派" }
+                    ]
+                },
+                {
+                    text: "当朋友向你倾诉一个复杂的烦恼时，你通常会？",
+                    options: [
+                        { text: "帮他一步步分析情况，列出可能的解决方案。", type: "精雕流" },
+                        { text: "首先感受他的情绪，给予支持和理解，相信答案会自然浮现。", type: "随形流" }
+                    ]
+                },
+                {
+                    text: "周末来临，你更倾向于？",
+                    options: [
+                        { text: "有一个清晰的计划表，知道每个时间段要做什么。", type: "秩序螺号" },
+                        { text: "随心而动，看看当天的心情和天气再决定。", type: "灵动珍珠" }
+                    ]
+                },
+                {
+                    text: "你认为一件完美的贝雕作品，最重要的特质是？",
+                    options: [
+                        { text: "工艺精湛，无可挑剔，每一个线条都清晰流畅。", type: "精雕流" },
+                        { text: "神韵生动，能讲述一个故事，传递一种情感。", type: "随形流" }
+                    ]
+                },
+                {
+                    text: "你从哪里获得最大的能量？",
+                    options: [
+                        { text: "在热闹的聚会和社交活动中。", type: "潮涌派" },
+                        { text: "在独处阅读、沉思或与大自然相处时。", type: "凝砂派" }
+                    ]
+                },
+                {
+                    text: "你如何描述你理想中的生活空间？",
+                    options: [
+                        { text: "整洁、有序，每件物品都有其固定的位置。", type: "秩序螺号" },
+                        { text: "舒适、随性，充满了偶然发现的美和变化的可能。", type: "灵动珍珠" }
+                    ]
+                },
+                {
+                    text: "欣赏一首诗或一幅画时，你更关注？",
+                    options: [
+                        { text: "它具体描绘了什么，技巧如何，色彩和构图怎样。", type: "具象之锚" },
+                        { text: "它引发的联想和感受，背后的意境和象征意义。", type: "抽象之浪" }
+                    ]
+                }
+            ];
+
+            const personalityTypes = {
+                "潮涌派_具象之锚_精雕流_秩序螺号": { title: "灯塔守护者", description: "你理性、可靠且务实。你像海岸边的灯塔，为他人提供清晰的指引和稳定的支持。你的作品结构严谨，工艺精湛，是规则与美的完美结合。在生活中，你是那个能制定完美计划并执行到底的人。" },
+                "潮涌派_抽象之浪_随形流_灵动珍珠": { title: "逐浪诗人", description: "你热情、富有想象力且善于交际。你的灵感来自人群与情感的浪潮，作品充满故事性和流动的美感。你随性而为，是朋友中的“氛围担当”，总能带来惊喜和欢乐。" },
+                "凝砂派_具象之锚_精雕流_秩序螺号": { title: "深海学者", description: "你专注、深刻且追求完美。你享受独处的钻研时光，像一位在深海探索的学者。你的作品细节惊人，经得起反复推敲。你对专业知识有极强的掌握欲，是某个领域的专家。" },
+                "凝砂派_抽象之浪_随形流_灵动珍珠": { title: "月光幻梦师", description: "你温柔、直觉敏锐且充满灵性。你的内心世界如月光下的海面，深邃而梦幻。你的作品抽象而富有诗意，能触动人心最柔软的部分。你追求精神世界的和谐与意义。" },
+                "潮涌派_具象之锚_随形流_秩序螺号": { title: "港湾建造师", description: "你友善、有同情心且组织力强。你善于倾听并为他人的情感“建造港湾”。你的作品温暖而实用，充满人文关怀。你是社区的粘合剂，总能将大家凝聚在一起。" },
+                "凝砂派_抽象之浪_精雕流_灵动珍珠": { title: "星砂建筑师", description: "你思想独立、富有创意且逻辑严密。你能将天马行空的抽象概念，用精妙的逻辑构建成现实。你的作品兼具未来感与结构性。你是一个低调的革新者。" },
+                "潮涌派_抽象之浪_精雕流_秩序螺号": { title: "潮汐战略家", description: "你视野开阔、善于策划且充满魅力。你能洞察潮流，并制定出宏大的战略。你的作品往往气势磅礴，概念新颖。你是天生的项目领导者和愿景规划师。" },
+                "凝砂派_具象之锚_随形流_灵动珍珠": { title: "时光收藏家", description: "你怀旧、细腻且忠于内心。你善于从过往的回忆和具体的物件中捕捉情感，并将其温柔地呈现。你的作品充满私人叙事和治愈感，像一本用贝壳写成的日记。" },
+                // 填充剩余的8种组合，以防出现未定义的情况
+                "潮涌派_具象之锚_精雕流_灵动珍珠": { title: "灵感工匠", description: "你既务实又灵活，能将清晰的目标通过即兴的方式实现。你的作品既有精湛的工艺，又不失生活的趣味。" },
+                "潮涌派_具象之锚_随形流_灵动珍珠": { title: "海岸叙事者", description: "你善于在现实事物中发现人情温暖，并乐于分享。你的作品充满生活气息和关怀，将具体的故事娓娓道来。" },
+                "潮涌派_抽象之浪_精雕流_灵动珍珠": { title: "风暴雕刻家", description: "你充满活力与创意，能将宏大的构想用逻辑和技巧实现。你的作品大胆而富有冲击力，总能引领新的潮流。" },
+                "潮涌派_抽象之浪_随形流_秩序螺号": { title: "珊瑚歌者", description: "你有计划地将人与人的情感连接，创造和谐的氛围。你的作品充满象征意义，并以温暖的方式构建出一个完整的社群故事。" },
+                "凝砂派_具象之锚_精雕流_灵动珍珠": { title: "孤岛发明家", description: "你在独处中迸发灵感，将现实中的问题用巧妙和创新的方式解决。你的作品是功能与智慧的结晶，实用而独特。" },
+                "凝砂派_具象之锚_随形流_秩序螺号": { title: "礁石守护人", description: "你默默地、有条不紊地守护着你珍视的人和事。你的作品朴实而充满情感，是时间和承诺的见证。" },
+                "凝砂派_抽象之浪_精雕流_秩序螺号": { title: "深渊思想家", description: "你在宁静中构思宏大的蓝图，并用严谨的逻辑将其规划。你的作品深邃而富有哲理，结构清晰，引人深思。" },
+                "凝砂派_抽象之浪_随形流_秩序螺号": { title: "海月记录者", description: "你用有条理的方式记录内心的感受和梦境。你的作品充满诗意和秩序感，如同将梦境编织成精美的挂毯。" }
+            };
+
+            const dimensionMap = {
+                '潮涌派': '潮涌派', '凝砂派': '凝砂派',
+                '具象之锚': '具象之锚', '抽象之浪': '抽象之浪',
+                '精雕流': '精雕流', '随形流': '随形流',
+                '秩序螺号': '秩序螺号', '灵动珍珠': '灵动珍珠'
+            };
+
+            const dimensionPairs = [
+                ['潮涌派', '凝砂派'],
+                ['具象之锚', '抽象之浪'],
+                ['精雕流', '随形流'],
+                ['秩序螺号', '灵动珍珠']
+            ];
+
+            let currentQuestionIndex = 0;
+            let answerHistory = []; // 用于记录答案历史
+
+            const startPage = document.getElementById('page-start');
+            const questionPage = document.getElementById('page-question');
+            const resultPage = document.getElementById('page-result');
+            const startBtn = document.getElementById('start-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const backBtn = document.getElementById('back-btn');
+
+            function showPage(pageElement) {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                pageElement.classList.add('active');
+            }
+
+            function showQuestion(index) {
+                backBtn.style.display = index > 0 ? 'block' : 'none';
+
+                const question = questions[index];
+                document.getElementById('question-counter').textContent = `${index + 1} / ${questions.length}`;
+                document.getElementById('question-text').textContent = question.text;
+                const optionsContainer = document.getElementById('question-options');
+                optionsContainer.innerHTML = '';
+                question.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'btn';
+                    button.textContent = option.text;
+                    button.onclick = () => selectAnswer(option.type);
+                    optionsContainer.appendChild(button);
+                });
+                showPage(questionPage);
+            }
+
+            function selectAnswer(type) {
+                answerHistory.push(type);
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questions.length) {
+                    showQuestion(currentQuestionIndex);
+                } else {
+                    calculateAndShowResult();
+                }
+            }
+
+            function goBack() {
+                if (currentQuestionIndex > 0) {
+                    currentQuestionIndex--;
+                    answerHistory.pop();
+                    showQuestion(currentQuestionIndex);
+                }
+            }
+
+            function calculateAndShowResult() {
+                let answers = {};
+                answerHistory.forEach(type => {
+                     const dimension = dimensionPairs.find(pair => pair.includes(type));
+                    if (dimension) {
+                        answers[dimension.join('_')] = type;
+                    }
+                });
+
+                const resultKey = dimensionPairs.map(pair => answers[pair.join('_')] || pair[1]).join('_');
+                const result = personalityTypes[resultKey];
+
+                if (result) {
+                    document.getElementById('result-title').textContent = result.title;
+                    document.getElementById('result-type').textContent = resultKey.replace(/_/g, ' + ');
+                    document.getElementById('result-description').textContent = result.description;
+                } else {
+                    document.getElementById('result-title').textContent = "未知贝壳";
+                    document.getElementById('result-type').textContent = "";
+                    document.getElementById('result-description').textContent = "你的选择构成了一种独特而罕见的组合，如同一枚尚未被定义的深海贝壳，充满了无限的可能性。";
+                }
+                showPage(resultPage);
+            }
+
+            function resetTest() {
+                currentQuestionIndex = 0;
+                answerHistory = [];
+                showPage(startPage);
+            }
+
+            startBtn.addEventListener('click', () => showQuestion(0));
+            restartBtn.addEventListener('click', resetTest);
+            backBtn.addEventListener('click', goBack);
+        });
+    </script>
+
+</body>
+</html>

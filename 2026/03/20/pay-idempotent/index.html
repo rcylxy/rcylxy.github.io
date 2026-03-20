@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>基于"一锁二判三更新"实现支付幂等 | 李晓阳的技术博客</title><meta name="author" content="李晓阳"><meta name="copyright" content="李晓阳"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文介绍如何基于"一锁二判三更新"的设计模式实现支付系统的幂等性控制，避免订单消息的重复消费，确保支付流程的可靠性和一致性。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="基于"一锁二判三更新"实现支付幂等">
+<meta property="og:url" content="https://rcylxy.github.io/2026/03/20/pay-idempotent/index.html">
+<meta property="og:site_name" content="李晓阳的技术博客">
+<meta property="og:description" content="本文介绍如何基于"一锁二判三更新"的设计模式实现支付系统的幂等性控制，避免订单消息的重复消费，确保支付流程的可靠性和一致性。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://rcylxy.github.io/img/avatar.jpg">
+<meta property="article:published_time" content="2026-03-20T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-20T08:00:00.000Z">
+<meta property="article:author" content="李晓阳">
+<meta property="article:tag" content="幂等">
+<meta property="article:tag" content="分布式事务">
+<meta property="article:tag" content="支付系统">
+<meta property="article:tag" content="消息队列">
+<meta property="article:tag" content="架构设计">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://rcylxy.github.io/img/avatar.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "基于"一锁二判三更新"实现支付幂等",
+  "url": "https://rcylxy.github.io/2026/03/20/pay-idempotent/",
+  "image": "https://rcylxy.github.io/img/avatar.jpg",
+  "datePublished": "2026-03-20T02:00:00.000Z",
+  "dateModified": "2026-03-20T08:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "李晓阳",
+      "url": "https://rcylxy.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://rcylxy.github.io/2026/03/20/pay-idempotent/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '基于"一锁二判三更新"实现支付幂等',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 8.0.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">14</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">李晓阳的技术博客</span></a><a class="nav-page-title" href="/"><span class="site-name">基于"一锁二判三更新"实现支付幂等</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">基于"一锁二判三更新"实现支付幂等</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-20T02:00:00.000Z" title="发表于 2026-03-20 10:00:00">2026-03-20</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-20T08:00:00.000Z" title="更新于 2026-03-20 16:00:00">2026-03-20</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><blockquote>
+<p>写在前面：在分布式系统中，支付环节是资金安全的关键。任何重复扣款、重复退款都可能造成严重的经济损失。本文介绍一种"一锁二判三更新"的设计模式，通过多层次的幂等控制，确保支付流程的可靠性和一致性。</p>
+</blockquote>
+
+<h1 id="一、为什么支付幂等如此重要？">一、为什么支付幂等如此重要？</h1>
+
+<h2 id="1-1-问题场景">1.1 问题场景</h2>
+
+<p>在分布式支付系统中，消息重复消费是导致支付事故的高频原因：</p>
+
+<table>
+<thead>
+<tr><th>场景</th><th>问题描述</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>网络抖动</strong></td><td>支付回调网络超时，触发重试</td></tr>
+<tr><td><strong>消费者重启</strong></td><td>消息消费者重启，消息重新投递</td></tr>
+<tr><td><strong>MQ重试机制</strong></td><td>消息队列自动重试失败消息</td></tr>
+<tr><td><strong>用户重复点击</strong></td><td>用户快速点击支付按钮</td></tr>
+<tr><td><strong>幂等号重用</strong></td><td>同一业务使用相同幂等号</td></tr>
+</tbody>
+</table>
+
+<h2 id="1-2-问题后果">1.2 问题后果</h2>
+
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        支付回调场景                                │
+│                                                                 │
+│  支付成功 → 回调通知 → 网络超时 → MQ重试 → ???                       │
+│                                             ↓                    │
+│                                    ┌─────────────┐              │
+│                                    │ 重复通知！   │              │
+│                                    └─────────────┘              │
+│                                             ↓                    │
+│                                    ┌─────────────┐              │
+│                                    │ 重复发货！   │              │
+│                                    │ 重复扣款！   │              │
+│                                    └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<h2 id="1-3-核心原则">1.3 核心原则</h2>
+
+<p><strong>支付幂等的核心原则</strong>：</p>
+<ol>
+<li><strong>接口幂等</strong>：同一个请求多次调用，结果一致</li>
+<li><strong>消息幂等</strong>：同一条消息被消费多次，只生效一次</li>
+<li><strong>补偿幂等</strong>：失败重试时，不会造成数据不一致</li>
+</ol>
+
+<h1 id="二、"一锁二判三更新"设计模式">二、"一锁二判三更新"设计模式</h1>
+
+<h2 id="2-1-模式概述">2.1 模式概述</h2>
+
+<p>"一锁二判三更新"是一种多层防护的幂等设计模式：</p>
+
+<table>
+<thead>
+<tr><th>层级</th><th>名称</th><th>作用</th><th>实现方式</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>一锁</strong></td><td>数据层锁</td><td>防止并发写入</td><td>分布式锁 / 数据库唯一索引</td></tr>
+<tr><td><strong>二判</strong></td><td>幂等性判断</td><td>识别重复请求</td><td>幂等号查询 / 状态判断</td></tr>
+<tr><td><strong>三更新</strong></td><td>分阶段更新</td><td>确保更新安全</td><td>预扣 → 确认 / 状态机</td></tr>
+</tbody>
+</table>
+
+<h2 id="2-2-核心设计思想">2.2 核心设计思想</h2>
+
+<h3>为什么需要三层防护？</h3>
+
+<p><strong>单层判断的局限性</strong>：</p>
+
+<pre><code class="lang-java">// ❌ 单一判断的并发问题
+public void pay(PayRequest request) {
+    // 1. 检查是否已支付
+    if (isPaid(request.getOrderId())) {
+        return; // 已被支付，直接返回
+    }
+    // 2. 执行支付
+    doPay(request);
+}
+</code></pre>
+
+<p>问题：当两个请求同时到达时，可能都通过第1步的判断，导致重复支付。</p>
+
+<p><strong>多层防护的优势</strong>：</p>
+
+<pre><code class="lang-java">// ✓ 多层防护的并发安全
+public void pay(PayRequest request) {
+    // 一锁：获取分布式锁
+    RLock lock = redissonClient.getLock("pay:" + request.getOrderId());
+    try {
+        // 二判：双重判断
+        // 第一次判断：查询支付记录是否存在
+        PayOrder existPayOrder = findByIdentifier(request.getIdentifier());
+        if (existPayOrder != null) {
+            return; // 幂等返回
+        }
+        
+        // 第二次判断：检查订单状态
+        if (isPaid(request.getOrderId())) {
+            return; // 已被支付
+        }
+        
+        // 三更新：分阶段更新
+        // 阶段1：创建支付单（中间状态）
+        createPayOrder(request);
+        // 阶段2：调用支付渠道
+        callPayChannel(request);
+        // 阶段3：更新支付结果（终态）
+        updatePayResult(request);
+        
+    } finally {
+        lock.unlock();
+    }
+}
+</code></pre>
+
+<h1 id="三、核心实现">三、核心实现</h1>
+
+<h2 id="3-1-幂等号设计">3.1 幂等号设计</h2>
+
+<p>幂等号（Identifier）是幂等控制的核心，它需要满足：</p>
+
+<ol>
+<li><strong>唯一性</strong>：全局唯一</li>
+<li><strong>业务含义</strong>：可追溯</li>
+<li><strong>不变性</strong>：同一业务操作使用相同标识</li>
+</ol>
+
+<pre><code class="lang-java">public class MessageBody {
+    /**
+     * 幂等号
+     * 格式：业务类型_业务ID_操作类型
+     * 示例：PAY_ORDER_123456_CREATE
+     */
+    private String identifier;
+    
+    /**
+     * 消息体
+     */
+    private String body;
+}
+
+// 消息发送时自动生成幂等号
+public boolean send(String topic, Object message) {
+    MessageBody messageBody = new MessageBody()
+        .setIdentifier(generateIdentifier(message))  // 自动生成
+        .setBody(JSON.toJSONString(message));
+    return streamBridge.send(topic, messageBody);
+}
+</code></pre>
+
+<h2 id="3-2-支付单创建（幂等）">3.2 支付单创建（幂等）</h2>
+
+<pre><code class="lang-java">public PayOrder create(PayCreateRequest request) {
+    // 一锁：使用乐观锁
+    // 通过唯一索引保证：bizNo + payerId + bizType + payChannel 唯一
+    
+    // 二判：检查是否已存在
+    PayOrder existPayOrder = payOrderMapper.selectByBizNoAndPayer(
+        request.getPayerId(),
+        request.getBizNo(),
+        request.getBizType().name(),
+        request.getPayChannel().name()
+    );
+    
+    // 幂等返回：已存在且未过期
+    if (existPayOrder != null) {
+        if (existPayOrder.getOrderState() != PayOrderState.EXPIRED) {
+            return existPayOrder;
+        }
+    }
+    
+    // 三更新：创建支付单
+    PayOrder payOrder = PayOrder.create(request);
+    payOrderMapper.insert(payOrder);
+    
+    return payOrder;
+}
+</code></pre>
+
+<h2 id="3-3-支付成功回调（幂等）">3.3 支付成功回调（幂等）</h2>
+
+<pre><code class="lang-java">public boolean paySuccess(PaySuccessEvent event) {
+    // 一锁：分布式锁
+    RLock lock = redissonClient.getLock("pay:success:" + event.getPayOrderId());
+    lock.lock();
+    
+    try {
+        // 二判：第一次判断 - 检查支付单是否存在
+        PayOrder payOrder = payOrderMapper.selectById(event.getPayOrderId());
+        if (payOrder == null) {
+            return false;
+        }
+        
+        // 二判：第二次判断 - 检查是否已支付（核心幂等）
+        if (payOrder.isPaid()) {
+            log.info("Pay order already paid, idempotent return. orderId={}", event.getPayOrderId());
+            return true;  // 幂等返回
+        }
+        
+        // 二判：第三次判断 - 检查订单状态（交易订单）
+        TradeOrder tradeOrder = tradeOrderMapper.selectByOrderId(event.getBizNo());
+        if (tradeOrder != null && tradeOrder.isPaid()) {
+            log.info("Trade order already paid, idempotent return. orderId={}", event.getBizNo());
+            return true;
+        }
+        
+        // 三更新：分阶段更新
+        // 阶段1：更新支付单状态
+        updatePayOrderState(payOrder, PayOrderState.PAID);
+        
+        // 阶段2：更新交易订单状态（发送消息）
+        sendOrderPaidMessage(event.getBizNo());
+        
+        return true;
+        
+    } finally {
+        lock.unlock();
+    }
+}
+</code></pre>
+
+<h2 id="3-4-订单状态更新（幂等）">3.4 订单状态更新（幂等）</h2>
+
+<pre><code class="lang-java">public OrderResponse doExecute(BaseOrderUpdateRequest request, Consumer&lt;TradeOrder&gt; action) {
+    // 一锁：分布式锁
+    RLock lock = redissonClient.getLock("order:update:" + request.getOrderId());
+    lock.lock();
+    
+    try {
+        // 二判：第一次判断 - 查询订单
+        TradeOrder existOrder = orderMapper.selectByOrderId(request.getOrderId());
+        
+        // 二判：第二次判断 - 幂等号检查（防重复消费）
+        TradeOrderStream existStream = orderStreamMapper.selectByIdentifier(
+            request.getIdentifier(),
+            request.getOrderEvent().name(),
+            request.getOrderId()
+        );
+        
+        if (existStream != null) {
+            log.info("Order event already processed, idempotent return. identifier={}", request.getIdentifier());
+            return OrderResponse.buildDuplicated(existStream.getOrderId(), existStream.getId().toString());
+        }
+        
+        // 二判：第三次判断 - 状态检查
+        if (isTerminalState(existOrder, request.getOrderEvent())) {
+            log.info("Order already in terminal state, skip. orderId={}", request.getOrderId());
+            return OrderResponse.buildDuplicated(existOrder.getOrderId(), null);
+        }
+        
+        // 三更新：执行更新
+        // 阶段1：执行业务逻辑
+        action.accept(existOrder);
+        
+        // 阶段2：记录处理流水
+        TradeOrderStream stream = new TradeOrderStream()
+            .setIdentifier(request.getIdentifier())
+            .setOrderEvent(request.getOrderEvent())
+            .setOrderId(request.getOrderId());
+        orderStreamMapper.insert(stream);
+        
+        // 阶段3：更新订单状态
+        orderMapper.updateById(existOrder);
+        
+        return OrderResponse.buildSuccess(existOrder.getOrderId(), stream.getId().toString());
+        
+    } finally {
+        lock.unlock();
+    }
+}
+</code></pre>
+
+<h1 id="四、支付幂等状态机">四、支付幂等状态机</h1>
+
+<h2 id="4-1-支付单状态流转">4.1 支付单状态流转</h2>
+
+<pre><code>┌─────────────┐    创建     ┌─────────────┐   支付成功   ┌─────────┐
+│   CREATED   │ ──────────► │   PENDING   │ ──────────► │  PAID   │
+└─────────────┘             └─────────────┘             └─────────┘
+       │                           │                           │
+       │                           │                           │
+       │ 过期/取消                 │ 支付失败                   │ 退款
+       ▼                           ▼                           ▼
+┌─────────────┐             ┌─────────────┐             ┌───────────┐
+│   EXPIRED   │             │   FAILED    │             │  REFUNDED │
+└─────────────┘             └─────────────┘             └───────────┘
+</code></pre>
+
+<h2 id="4-2-状态检查核心代码">4.2 状态检查核心代码</h2>
+
+<pre><code class="lang-java">public class PayOrder {
+    
+    /**
+     * 判断是否已支付
+     * 满足以下条件视为已支付：
+     * 1. 支付金额 > 0
+     * 2. 状态为 PAID 或 REFUNDED
+     * 3. 有渠道流水号
+     * 4. 有支付成功时间
+     */
+    public boolean isPaid() {
+        return paidAmount.compareTo(BigDecimal.ZERO) > 0
+                &amp;&amp; (orderState == PayOrderState.PAID || orderState == PayOrderState.REFUNDED)
+                &amp;&amp; channelStreamId != null
+                &amp;&amp; paySucceedTime != null;
+    }
+    
+    /**
+     * 判断是否可支付
+     */
+    public boolean canPay() {
+        return orderState == PayOrderState.PENDING;
+    }
+    
+    /**
+     * 判断是否可退款
+     */
+    public boolean canRefund() {
+        return isPaid() &amp;&amp; refundAmount.compareTo(paidAmount) &lt; 0;
+    }
+}
+</code></pre>
+
+<h1 id="五、消息消费幂等">五、消息消费幂等</h1>
+
+<h2 id="5-1-消息幂等处理流程">5.1 消息幂等处理流程</h2>
+
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                      消息消费幂等处理流程                          │
+│                                                                 │
+│  消息到达                                                        │
+│     │                                                           │
+│     ▼                                                           │
+│  提取幂等号                                                      │
+│     │                                                           │
+│     ▼                                                           │
+│  ┌──────────────────┐                                          │
+│  │  一锁：分布式锁     │                                          │
+│  │  lock(identifier) │                                          │
+│  └────────┬───────────┘                                          │
+│           │                                                      │
+│           ▼                                                      │
+│  ┌──────────────────┐    已存在      ┌────────────┐              │
+│  │ 二判：检查流水表   │ ───────────► │ 幂等返回    │              │
+│  │ selectById(id)   │               └────────────┘              │
+│  └────────┬───────────┘                                          │
+│           │ 不存在                                               │
+│           ▼                                                      │
+│  ┌──────────────────┐    已终态      ┌────────────┐              │
+│  │ 三判断：检查状态   │ ───────────► │ 幂等返回    │              │
+│  │ isTerminal()     │               └────────────┘              │
+│  └────────┬───────────┘                                          │
+│           │ 非终态                                               │
+│           ▼                                                      │
+│  ┌──────────────────┐                                            │
+│  │ 三更新：执行业务   │                                            │
+│  │ + 记录流水        │                                            │
+│  └──────────────────┘                                            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<h2 id="5-2-消息消费者示例">5.2 消息消费者示例</h2>
+
+<pre><code class="lang-java">@RocketMQMessageListener(topic = "pay-result-topic", consumerGroup = "pay-group")
+public class PayResultListener implements RocketMQListener&lt;MessageBody&gt; {
+    
+    @Autowired
+    private PayApplicationService payApplicationService;
+    
+    @Override
+    public void onMessage(MessageBody message) {
+        String identifier = message.getIdentifier();
+        log.info("Received pay result message, identifier={}", identifier);
+        
+        try {
+            // 解析消息
+            PaySuccessEvent event = JSON.parseObject(message.getBody(), PaySuccessEvent.class);
+            
+            // 执行支付成功处理（内部已包含幂等逻辑）
+            boolean result = payApplicationService.paySuccess(event);
+            
+            if (result) {
+                log.info("Pay result processed successfully, identifier={}", identifier);
+            }
+            
+        } catch (Exception e) {
+            log.error("Pay result processing failed, identifier={}", identifier, e);
+            // 抛出异常，触发MQ重试
+            throw e;
+        }
+    }
+}
+</code></pre>
+
+<h1 id="六、退款幂等处理">六、退款幂等处理</h1>
+
+<h2 id="6-1-退款单创建（幂等）">6.1 退款单创建（幂等）</h2>
+
+<pre><code class="lang-java">public RefundOrder create(RefundCreateRequest request) {
+    // 一锁：分布式锁
+    RLock lock = redissonClient.getLock("refund:create:" + request.getPayOrderId());
+    lock.lock();
+    
+    try {
+        // 二判：检查支付单是否存在且已支付
+        PayOrder payOrder = payOrderMapper.selectById(request.getPayOrderId());
+        if (payOrder == null || !payOrder.isPaid()) {
+            throw new BusinessException("支付单不存在或未支付");
+        }
+        
+        // 二判：幂等号检查
+        RefundOrder existRefund = refundOrderMapper.selectByIdentifier(
+            request.getPayOrderId(),
+            request.getIdentifier(),
+            request.getRefundChannel().name()
+        );
+        
+        if (existRefund != null) {
+            log.info("Refund already exists, idempotent return. identifier={}", request.getIdentifier());
+            return existRefund;  // 幂等返回
+        }
+        
+        // 三更新：创建退款单
+        RefundOrder refundOrder = RefundOrder.create(request, payOrder);
+        refundOrderMapper.insert(refundOrder);
+        
+        // 异步调用退款渠道
+        asyncCallRefundChannel(refundOrder);
+        
+        return refundOrder;
+        
+    } finally {
+        lock.unlock();
+    }
+}
+</code></pre>
+
+<h1 id="七、方案总结">七、方案总结</h1>
+
+<h2 id="7-1-幂等控制策略对比">7.1 幂等控制策略对比</h2>
+
+<table>
+<thead>
+<tr><th>策略</th><th>适用场景</th><th>优点</th><th>缺点</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>唯一索引</strong></td><td>数据库写入</td><td>简单可靠</td><td>需要数据库支持</td></tr>
+<tr><td><strong>分布式锁</strong></td><td>高并发场景</td><td>并发安全</td><td>性能开销</td></tr>
+<tr><td><strong>幂等号查询</strong></td><td>消息消费</td><td>防重复消费</td><td>需要额外表</td></tr>
+<tr><td><strong>状态机检查</strong></td><td>状态变更</td><td>逻辑严谨</td><td>实现复杂</td></tr>
+</tbody>
+</table>
+
+<h2 id="7-2-本方案特点">7.2 本方案特点</h2>
+
+<table>
+<thead>
+<tr><th>特性</th><th>实现</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>并发安全</strong></td><td>分布式锁 + 数据库唯一索引</td></tr>
+<tr><td><strong>重复识别</strong></td><td>幂等号 + 状态检查</td></tr>
+<tr><td><strong>分层更新</strong></td><td>预扣 → 确认 → 终态</td></tr>
+<tr><td><strong>失败重试</strong></td><td>MQ重试 + 幂等返回</td></tr>
+<tr><td><strong>可追溯</strong></td><td>流水表记录</td></tr>
+</tbody>
+</table>
+
+<h2 id="7-3-核心价值">7.3 核心价值</h2>
+
+<ol>
+<li><strong>资金安全</strong>：多层次防护，杜绝重复扣款</li>
+<li><strong>系统可靠</strong>：消息重试不影响正确性</li>
+<li><strong>易于维护</strong>：统一的幂等处理模式</li>
+<li><strong>可追溯</strong>：完整的操作流水记录</li>
+</ol>
+
+<p>如果你在构建支付系统，不妨参考这一设计思路。</p>
+
+<hr>
+<p><em>本文作者：李晓阳，电子科技大学计算机科学与技术专业在读研究生，专注于 Java 开发与分布式系统设计。</em></p></article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://rcylxy.github.io">李晓阳</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://rcylxy.github.io/2026/03/20/pay-idempotent/">https://rcylxy.github.io/2026/03/20/pay-idempotent/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。版权归作者所有，转载需注明出处！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%B9%82%E7%AD%89/">幂等</a><a class="post-meta__tags" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/">分布式事务</a><a class="post-meta__tags" href="/tags/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F/">支付系统</a><a class="post-meta__tags" href="/tags/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/">消息队列</a><a class="post-meta__tags" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/01/10/distributed-lock-annotation/" title="基于 AOP + 自定义注解 + Redisson 实现分布式锁"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">基于 AOP + 自定义注解 + Redisson 实现分布式锁</div></div><div class="info-2"><div class="info-item-1">基于 AOP + 自定义注解 + Redisson 实现分布式锁前言在分布式系统中，多个服务实例可能同时操作同一份数据，如果没有同步机制，就会产生并发问题。</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">李晓阳</div><div class="author-info-description">电子科技大学计算机科学与技术专业在读研究生，专注于Java开发、Python脚本、机器学习研究</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">14</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/rcylxy"><i class="fab fa-github"></i><span>访问我的GitHub</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/rcylxy" target="_blank" title="fab fa-github"><i class="GitHub"></i></a><a class="social-icon" href="mailto:lixiaoyang@example.com" target="_blank" title="fas fa-envelope"><i class="Email"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到我的技术博客！这里分享Java开发、Python脚本和机器学习相关内容。作为电子科技大学的研究生，我致力于将学术研究与实际应用相结合。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E6%94%AF%E4%BB%98%E5%B9%82%E7%AD%89%E5%A6%82%E6%AD%A4%E9%87%8D%E8%A6%81%EF%BC%9F"><span class="toc-number">1.</span> <span class="toc-text">一、为什么支付幂等如此重要？</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-1-%E9%97%AE%E9%A2%98%E5%9C%BA%E6%99%AF"><span class="toc-number">1.1</span> <span class="toc-text">1.1 问题场景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-2-%E9%97%AE%E9%A2%98%E5%90%8E%E6%9E%9C"><span class="toc-number">1.2</span> <span class="toc-text">1.2 问题后果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-3-%E6%A0%B8%E5%BF%83%E5%8E%9F%E5%88%99"><span class="toc-number">1.3</span> <span class="toc-text">1.3 核心原则</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E2%80%9C%E4%B8%80%E9%94%81%E4%BA%8C%E5%88%A4%E4%B8%89%E6%9B%B4%E6%96%B0%E2%80%9D%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F"><span class="toc-number">2.</span> <span class="toc-text">二、"一锁二判三更新"设计模式</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-%E6%A8%A1%E5%BC%8F%E6%A6%82%E8%BF%B0"><span class="toc-number">2.1</span> <span class="toc-text">2.1 模式概述</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-%E6%A0%B8%E5%BF%83%E8%AE%BE%E8%AE%A1%E6%80%9D%E6%83%B3"><span class="toc-number">2.2</span> <span class="toc-text">2.2 核心设计思想</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%A0%B8%E5%BF%83%E5%AE%9E%E7%8E%B0"><span class="toc-number">3.</span> <span class="toc-text">三、核心实现</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#3-1-%E5%B9%82%E7%AD%89%E5%8F%B7%E8%AE%BE%E8%AE%A1"><span class="toc-number">3.1</span> <span class="toc-text">3.1 幂等号设计</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-2-%E6%94%AF%E4%BB%98%E5%8D%95%E5%88%9B%E5%BB%BA%EF%BC%88%E5%B9%82%E7%AD%89%EF%BC%89"><span class="toc-number">3.2</span> <span class="toc-text">3.2 支付单创建（幂等）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-3-%E6%94%AF%E4%BB%98%E6%88%90%E5%8A%9F%E5%9B%9E%E8%B0%83%EF%BC%88%E5%B9%82%E7%AD%89%EF%BC%89"><span class="toc-number">3.3</span> <span class="toc-text">3.3 支付成功回调（幂等）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-4-%E8%AE%A2%E5%8D%95%E7%8A%B6%E6%80%81%E6%9B%B4%E6%96%B0%EF%BC%88%E5%B9%82%E7%AD%89%EF%BC%89"><span class="toc-number">3.4</span> <span class="toc-text">3.4 订单状态更新（幂等）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E6%94%AF%E4%BB%98%E5%B9%82%E7%AD%89%E7%8A%B6%E6%80%81%E6%9C%BA"><span class="toc-number">4.</span> <span class="toc-text">四、支付幂等状态机</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#4-1-%E6%94%AF%E4%BB%98%E5%8D%95%E7%8A%B6%E6%80%81%E6%B5%81%E8%BD%AC"><span class="toc-number">4.1</span> <span class="toc-text">4.1 支付单状态流转</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-2-%E7%8A%B6%E6%80%81%E6%A3%80%E6%9F%A5%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81"><span class="toc-number">4.2</span> <span class="toc-text">4.2 状态检查核心代码</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E6%B6%88%E6%81%AF%E6%B6%88%E8%B4%B9%E5%B9%82%E7%AD%89"><span class="toc-number">5.</span> <span class="toc-text">五、消息消费幂等</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#5-1-%E6%B6%88%E6%81%AF%E5%B9%82%E7%AD%89%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B"><span class="toc-number">5.1</span> <span class="toc-text">5.1 消息幂等处理流程</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-2-%E6%B6%88%E6%81%AF%E6%B6%88%E8%B4%B9%E8%80%85%E7%A4%BA%E4%BE%8B"><span class="toc-number">5.2</span> <span class="toc-text">5.2 消息消费者示例</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E9%80%80%E6%AC%BE%E5%B9%82%E7%AD%89%E5%A4%84%E7%90%86"><span class="toc-number">6.</span> <span class="toc-text">六、退款幂等处理</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#6-1-%E9%80%80%E6%AC%BE%E5%8D%95%E5%88%9B%E5%BB%BA%EF%BC%88%E5%B9%82%E7%AD%89%EF%BC%89"><span class="toc-number">6.1</span> <span class="toc-text">6.1 退款单创建（幂等）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E6%96%B9%E6%A1%88%E6%80%BB%E7%BB%93"><span class="toc-number">7.</span> <span class="toc-text">七、方案总结</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#7-1-%E5%B9%82%E7%AD%89%E6%8E%A7%E5%88%B6%E7%AD%96%E7%95%A5%E5%AF%B9%E6%AF%94"><span class="toc-number">7.1</span> <span class="toc-text">7.1 幂等控制策略对比</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-2-%E6%9C%AC%E6%96%B9%E6%A1%88%E7%89%B9%E7%82%B9"><span class="toc-number">7.2</span> <span class="toc-text">7.2 本方案特点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-3-%E6%A0%B8%E5%BF%83%E4%BB%B7%E5%80%A4"><span class="toc-number">7.3</span> <span class="toc-text">7.3 核心价值</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/03/20/pay-idempotent/" title="基于"一锁二判三更新"实现支付幂等">基于"一锁二判三更新"实现支付幂等</a><time datetime="2026-03-20T02:00:00.000Z" title="发表于 2026-03-20 10:00:00">2026-03-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/01/10/distributed-lock-annotation/" title="基于 AOP + 自定义注解 + Redisson 实现分布式锁">基于 AOP + 自定义注解 + Redisson 实现分布式锁</a><time datetime="2026-01-10T02:00:00.000Z" title="发表于 2026-01-10 10:00:00">2026-01-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/01/26/springboot-circular-dependency-solution/" title="SpringBoot循环依赖问题深度解析与解决方案">SpringBoot循环依赖问题深度解析与解决方案</a><time datetime="2025-01-26T07:30:00.000Z" title="发表于 2025-01-26 15:30:00">2025-01-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/01/26/java-stream-api-guide/" title="Java Stream API 完全指南：从入门到实战">Java Stream API 完全指南：从入门到实战</a><time datetime="2025-01-26T02:00:00.000Z" title="发表于 2025-01-26 10:00:00">2025-01-26</time></div></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By 李晓阳</span></div><div class="footer_custom_text">由 Hexo 强力驱动 | 主题 - Butterfly</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

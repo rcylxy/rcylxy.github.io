@@ -76,7 +76,7 @@ description: 本文介绍如何基于"一锁二判三更新"的设计模式实�
 **单层判断的局限性**：
 
 ```java
-// ❌ 单一判断的并发问题
+// 反面示例：单一判断的并发问题
 public void pay(PayRequest request) {
     // 1. 检查是否已支付
     if (isPaid(request.getOrderId())) {

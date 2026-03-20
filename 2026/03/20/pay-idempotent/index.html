@@ -237,7 +237,7 @@
 
 <p><strong>单层判断的局限性</strong>：</p>
 
-<pre><code class="lang-java">// ❌ 单一判断的并发问题
+<pre><code class="lang-java">// 单一判断的并发问题
 public void pay(PayRequest request) {
     // 1. 检查是否已支付
     if (isPaid(request.getOrderId())) {

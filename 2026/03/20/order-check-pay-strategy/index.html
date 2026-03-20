@@ -192,7 +192,7 @@
 
 <p><strong>传统顺序校验的问题</strong>：当校验逻辑与业务逻辑混在一起时，每次新增或修改校验规则都需要改动核心代码，这违背了开闭原则。同时，校验顺序被代码固定，无法根据业务需求灵活调整。</p>
 
-<pre><code class="lang-java">// ❌ 耦合示例：校验逻辑与业务逻辑混在一起
+<pre><code class="lang-java">// 耦合示例：校验逻辑与业务逻辑混在一起
 public Order createOrder(CreateOrderRequest request) {
     // 库存校验 - 硬编码，无法灵活配置
     if (!checkStock(request)) {

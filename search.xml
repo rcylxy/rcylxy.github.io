@@ -76,6 +76,7 @@ SpringBoot循环依赖的检测：启动时异常信息、Spring Boot Actuator�
 总结：ThreadLocal 天然不具备跨线程传递的能力，必须借助 TransmittableThreadLocal 来实现上下文的完整传递]]></content>
   </entry>
 
+
   <entry>
     <title>基于 AOP + 自定义注解 + Redisson 实现分布式锁</title>
     <link href="/2026/01/10/distributed-lock-annotation/"/>

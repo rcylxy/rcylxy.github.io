@@ -72,50 +72,59 @@
     </div>
 
     <script>
-        // 搜索功能
+        // 搜索功能：对正文做「去 HTML + 去 URL」后再匹配，避免短词误命中标签/链接（如 "tt" 命中 https）
         let searchData = [];
-        
-        // 加载搜索数据
-        fetch('/search.xml')
-            .then(response => response.text())
-            .then(data => {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data, 'text/xml');
-                const items = xmlDoc.getElementsByTagName('item');
-                
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    searchData.push({
-                        title: item.getElementsByTagName('title')[0].textContent,
-                        link: item.getElementsByTagName('link')[0].textContent,
-                        description: item.getElementsByTagName('description')[0].textContent,
-                        pubDate: item.getElementsByTagName('pubDate')[0].textContent
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('加载搜索数据失败:', error);
-            });
 
-        // 搜索函数
+        function stripHtml(html) {
+            if (!html) return '';
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return (tmp.textContent || tmp.innerText || '').trim();
+        }
+
+        function normalizeForSearch(raw) {
+            let t = stripHtml(raw);
+            t = t.replace(/https?:\/\/\S+/gi, ' ');
+            t = t.replace(/\s+/g, ' ').trim();
+            return t;
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function matchQuery(item, keywords) {
+            const titleLower = item.title.toLowerCase();
+            const bodyLower = item.plainBody.toLowerCase();
+            return keywords.every(kw =>
+                titleLower.includes(kw) || bodyLower.includes(kw)
+            );
+        }
+
         function performSearch(query) {
-            if (!query.trim()) {
+            const q = query.trim();
+            if (!q) {
                 document.getElementById('searchResults').innerHTML = '';
                 return;
             }
+            if (!searchData.length) {
+                document.getElementById('searchResults').innerHTML =
+                    '<div class="no-results">正在加载文章索引，请稍候再试…</div>';
+                return;
+            }
 
-            const results = searchData.filter(item => 
-                item.title.toLowerCase().includes(query.toLowerCase()) ||
-                item.description.toLowerCase().includes(query.toLowerCase())
-            );
-
+            const keywords = q.toLowerCase().split(/\s+/).filter(Boolean);
+            const results = searchData.filter(item => matchQuery(item, keywords));
             displayResults(results);
         }
 
-        // 显示搜索结果
         function displayResults(results) {
             const resultsContainer = document.getElementById('searchResults');
-            
+
             if (results.length === 0) {
                 resultsContainer.innerHTML = '<div class="no-results">没有找到相关文章</div>';
                 return;
@@ -123,33 +132,67 @@
 
             let html = '';
             results.forEach(result => {
-                const pubDate = new Date(result.pubDate).toLocaleDateString('zh-CN');
+                const excerpt = result.excerptPreview.length > 220
+                    ? result.excerptPreview.slice(0, 220) + '…'
+                    : result.excerptPreview;
                 html += `
                     <div class="search-result-item">
                         <div class="search-result-title">
-                            <a href="${result.link}" style="color: #2196F3; text-decoration: none;">
-                                ${result.title}
+                            <a href="${escapeHtml(result.link)}" style="color: #2196F3; text-decoration: none;">
+                                ${escapeHtml(result.title)}
                             </a>
                         </div>
-                        <div class="search-result-excerpt">${result.description}</div>
-                        <div class="search-result-meta">
-                            <i class="fas fa-calendar"></i> ${pubDate}
-                        </div>
+                        <div class="search-result-excerpt">${escapeHtml(excerpt)}</div>
                     </div>
                 `;
             });
-            
+
             resultsContainer.innerHTML = html;
         }
 
-        // 绑定搜索事件
-        document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchInputEl = document.getElementById('searchInput');
+
+        fetch('/search.xml')
+            .then(response => response.text())
+            .then(data => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data, 'text/xml');
+                const entries = xmlDoc.getElementsByTagName('entry');
+
+                for (let i = 0; i < entries.length; i++) {
+                    const entry = entries[i];
+                    const titleEl = entry.getElementsByTagName('title')[0];
+                    const linkEl = entry.getElementsByTagName('link')[0];
+                    const urlEl = entry.getElementsByTagName('url')[0];
+                    const contentEl = entry.getElementsByTagName('content')[0];
+
+                    const title = titleEl ? titleEl.textContent.trim() : '';
+                    const rawHtml = contentEl ? contentEl.textContent : '';
+                    const plainBody = normalizeForSearch(rawHtml);
+                    const excerptPreview = plainBody || stripHtml(rawHtml);
+
+                    searchData.push({
+                        title,
+                        link: (linkEl && linkEl.getAttribute('href')) || (urlEl ? urlEl.textContent.trim() : ''),
+                        plainBody,
+                        excerptPreview
+                    });
+                }
+
+                performSearch(searchInputEl.value);
+            })
+            .catch(error => {
+                console.error('加载搜索数据失败:', error);
+                document.getElementById('searchResults').innerHTML =
+                    '<div class="no-results">加载搜索数据失败，请刷新页面重试</div>';
+            });
+
+        searchInputEl.addEventListener('input', function (e) {
             performSearch(e.target.value);
         });
 
-        // 页面加载时聚焦搜索框
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('searchInput').focus();
+        document.addEventListener('DOMContentLoaded', function () {
+            searchInputEl.focus();
         });
     </script>
 </body>
